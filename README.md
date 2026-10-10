@@ -65,13 +65,17 @@ fade_end_color: [255, 255, 255]   # optional
 
 With the default fade size, the fade ends at the middle of the card along the diagonal.
 
+## Layout tips
+
+For the header to line up with the sections below it, put it in its own section with **no background** (edit the section, then turn off **Background**). Sections with a background add padding, which makes the card narrower than the sections below and adds extra space underneath it.
+
 ## Theme variables (optional)
 
 | Variable                      | Default     |
 | ----------------------------- | ----------- |
 | `mdc-header-card-background`  | `#01152f`   |
-| `mdc-header-card-radius`      | `16px`      |
+| `mdc-header-card-radius`      | your theme's card radius (`12px` if not set) |
 | `mdc-header-title-margin`     | `0`         |
-| `mdc-header-title-padding`    | `2cqw 2.1cqw` (scales with the card) |
+| `mdc-header-title-padding`    | `max(2cqw, 12px) max(2.1cqw, 16px)` (scales with the card, never smaller than 12px / 16px) |
 
 The card loads Roboto from Google Fonts so that every weight, including Extra Light, is available.

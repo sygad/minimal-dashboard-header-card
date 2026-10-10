@@ -3,7 +3,7 @@
  * A background image with a diagonal colour fade and a title in the top left corner.
  */
 
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.3.1";
 
 console.info(
   `%c MINIMAL-DASHBOARD-HEADER-CARD %c v${CARD_VERSION} `,
@@ -95,7 +95,8 @@ const STYLES = `
     container-type: inline-size;
     box-sizing: border-box;
     border: none;
-    border-radius: var(--mdc-header-card-radius, 16px);
+    /* Same rounding as the other cards in the theme */
+    border-radius: var(--mdc-header-card-radius, var(--ha-card-border-radius, 12px));
     background-color: var(--mdc-header-card-background, #01152f);
     /* Fills the width; only scales up if the card is taller than the image */
     background-size: cover;
@@ -112,7 +113,9 @@ const STYLES = `
     top: 0;
     left: 0;
     margin: var(--mdc-header-title-margin, 0);
-    padding: var(--mdc-header-title-padding, 2cqw 2.1cqw);
+    /* Scales with the card, but never gets closer than 16px to the corner on small screens.
+       The top is smaller because the line box already has some space above the capitals. */
+    padding: var(--mdc-header-title-padding, max(2cqw, 12px) max(2.1cqw, 16px));
     line-height: 1;
     white-space: nowrap;
   }
