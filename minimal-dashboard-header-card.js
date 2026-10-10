@@ -3,7 +3,7 @@
  * A background image with a diagonal colour fade and a title in the top left corner.
  */
 
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 console.info(
   `%c MINIMAL-DASHBOARD-HEADER-CARD %c v${CARD_VERSION} `,
@@ -14,6 +14,7 @@ console.info(
 const DEFAULTS = {
   title: "Lounge",
   image: "",
+  image_position: "center",
   fade_start_color: [0, 0, 0],
   fade_start_opacity: 70,
   fade_end_color: [255, 255, 255],
@@ -25,9 +26,11 @@ const DEFAULTS = {
   font_weight: 200,
 };
 
-// The card keeps the shape of the reference design (2064 x 512) unless a height is set,
-// and the title scales with the card width, so it looks the same on a phone and a monitor.
+// The card keeps the shape of the reference design (2064 x 512) unless a height is set.
+// The width always comes from the dashboard layout, and the image, fade and title all
+// scale with the width only, so changing the height just shows more or less of the image.
 const ASPECT_RATIO = "2064 / 512";
+const IMAGE_HEIGHT_CQW = (512 / 2064) * 100; // image height as a % of the card width
 const TITLE_SIZE = "7.75cqw";
 
 // How quickly the fade falls off. 1 is linear; higher values fade out faster near the corner.
@@ -95,7 +98,9 @@ const STYLES = `
     border: none;
     border-radius: var(--mdc-header-card-radius, 16px);
     background-color: var(--mdc-header-card-background, #01152f);
+    /* Fills the width; only scales up if the card is taller than the image */
     background-size: cover;
+    background-repeat: no-repeat;
     background-position: center;
   }
   .fade {
@@ -168,15 +173,20 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
     const c = this._config;
 
+    // With a fixed height, turn off the aspect ratio so it can't change the width.
     this._card.style.height = c.height ? `${Number(c.height)}px` : "";
+    this._card.style.aspectRatio = c.height ? "auto" : "";
     this._card.style.backgroundImage = c.image ? `url("${c.image}")` : "none";
+    this._card.style.backgroundPosition = `center ${c.image_position}`;
 
     // An ellipse centred on the top left corner. With the default size its edge passes
-    // through the middle of the card, so the fade ends half way along the diagonal.
+    // through the middle of the image, so the fade ends half way along the diagonal.
+    // Both radii are based on the card width, so the fade doesn't change with the height.
     const stops = fadeStops(c.fade_start_color, c.fade_start_opacity, c.fade_end_color, c.fade_end_opacity);
-    this._fade.style.background = `radial-gradient(ellipse ${Number(c.fade_width)}% ${Number(
-      c.fade_height
-    )}% at 0 0, ${stops})`;
+    const fadeHeight = (Number(c.fade_height) / 100) * IMAGE_HEIGHT_CQW;
+    this._fade.style.background = `radial-gradient(ellipse ${Number(c.fade_width)}cqw ${fadeHeight.toFixed(
+      2
+    )}cqw at 0 0, ${stops})`;
 
     this._title.textContent = c.title || "";
     this._title.style.color = toCssColor(c.text_color, 100);
@@ -191,6 +201,26 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 const EDITOR_SCHEMA = [
   { name: "title", selector: { text: {} } },
   { name: "image", selector: { text: {} } },
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      { name: "height", selector: { number: { min: 40, max: 600, mode: "box", unit_of_measurement: "px" } } },
+      {
+        name: "image_position",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "top", label: "Top" },
+              { value: "center", label: "Middle" },
+              { value: "bottom", label: "Bottom" },
+            ],
+          },
+        },
+      },
+    ],
+  },
   {
     type: "grid",
     name: "",
@@ -213,7 +243,6 @@ const EDITOR_SCHEMA = [
           },
         },
       },
-      { name: "height", selector: { number: { min: 40, max: 600, mode: "box", unit_of_measurement: "px" } } },
     ],
   },
   {
@@ -243,12 +272,13 @@ const EDITOR_LABELS = {
   font_size: "Text size (blank = scale with card)",
   font_weight: "Text weight",
   height: "Card height (blank = match image shape)",
+  image_position: "Image alignment when the height crops it",
   fade_start_color: "Fade colour (top left)",
   fade_start_opacity: "Fade opacity (top left)",
   fade_end_color: "Fade colour (end)",
   fade_end_opacity: "Fade opacity (end)",
   fade_width: "Fade width (% of card width)",
-  fade_height: "Fade height (% of card height)",
+  fade_height: "Fade height (% of image height)",
 };
 
 class MinimalDashboardHeaderCardEditor extends HTMLElement {

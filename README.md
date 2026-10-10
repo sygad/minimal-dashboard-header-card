@@ -37,6 +37,8 @@ Or with YAML:
 type: custom:minimal-dashboard-header-card
 title: Lounge
 image: /local/lounge.jpeg
+height: 120                       # optional
+image_position: bottom            # optional: top, center or bottom
 text_color: [255, 255, 255]       # optional
 fade_start_color: [0, 0, 0]       # optional
 fade_end_color: [255, 255, 255]   # optional
@@ -52,13 +54,14 @@ fade_end_color: [255, 255, 255]   # optional
 | `font_size`          | scales with card  | Title size in px. Leave blank to scale with the card width       |
 | `font_weight`        | `200`             | Title weight (`200` is Roboto Extra Light)                       |
 | `font_family`        | `Roboto`          | Title font                                                       |
-| `height`             | image shape       | Card height in px. Leave blank to keep the 2064 × 512 shape      |
+| `height`             | image shape       | Card height in px. Leave blank to keep the 2064 × 512 shape. The width always comes from your dashboard layout |
+| `image_position`     | `center`          | Which part of the image to show when the height crops it: `top`, `center` or `bottom` |
 | `fade_start_color`   | `[0, 0, 0]`       | Fade colour in the top left corner                               |
 | `fade_start_opacity` | `70`              | Fade opacity in the top left corner (0–100)                      |
 | `fade_end_color`     | `[255, 255, 255]` | Fade colour where the fade ends                                  |
 | `fade_end_opacity`   | `0`               | Fade opacity where the fade ends (0–100)                         |
 | `fade_width`         | `52`              | How far the fade reaches to the right, as % of the card width    |
-| `fade_height`        | `132`             | How far the fade reaches down, as % of the card height           |
+| `fade_height`        | `132`             | How far the fade reaches down, as % of the image height          |
 
 With the default fade size, the fade ends at the middle of the card along the diagonal.
 
