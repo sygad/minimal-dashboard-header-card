@@ -356,6 +356,12 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
           const empty = value === "" || value === undefined || value === null;
           if (empty || (key !== "title" && isDefault(key, value))) delete config[key];
         });
+        // Until the phone height is changed, don't save it, so it keeps following the desktop height
+        const phoneUntouched =
+          this._config.height_percent_mobile === undefined && config.height_percent_mobile === this._shownMobile;
+        if (phoneUntouched || config.height_percent_mobile === (config.height_percent ?? DEFAULTS.height_percent)) {
+          delete config.height_percent_mobile;
+        }
         this.dispatchEvent(
           new CustomEvent("config-changed", {
             detail: { config },
@@ -372,6 +378,7 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     // The phone height starts at the desktop height until it's changed.
     const data = { ...DEFAULTS, ...this._config };
     if (data.height_percent_mobile === undefined) data.height_percent_mobile = data.height_percent;
+    this._shownMobile = data.height_percent_mobile;
     this._form.data = data;
   }
 }
