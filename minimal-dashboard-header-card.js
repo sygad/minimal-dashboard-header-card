@@ -14,7 +14,7 @@ console.info(
 const DEFAULTS = {
   title: "Lounge",
   image: "",
-  image_position: "center",
+  image_offset: 50,
   height_percent: 100,
   fade_start_color: [0, 0, 0],
   fade_start_opacity: 70,
@@ -37,6 +37,10 @@ const TITLE_SIZE = "7.75cqw";
 
 // Screens narrower than this use height_percent_mobile, if it's set.
 const MOBILE_BREAKPOINT = 768;
+
+// image_offset is 0 (top of the image) to 100 (bottom). image_position is from v0.2.0.
+const LEGACY_POSITIONS = { top: 0, center: 50, bottom: 100 };
+const imageOffset = (config) => config.image_offset ?? LEGACY_POSITIONS[config.image_position] ?? DEFAULTS.image_offset;
 
 // How quickly the fade falls off. 1 is linear; higher values fade out faster near the corner.
 const FADE_EASING = 1.6;
@@ -147,6 +151,7 @@ class MinimalDashboardHeaderCard extends HTMLElement {
   }
 
   setConfig(config) {
+    this._userConfig = config;
     this._config = { ...DEFAULTS, ...config };
     this._render();
   }
@@ -190,7 +195,7 @@ class MinimalDashboardHeaderCard extends HTMLElement {
     this._card.style.setProperty("--mdc-header-ratio", ratio(desktopPercent));
     this._card.style.setProperty("--mdc-header-ratio-mobile", ratio(mobilePercent));
     this._card.style.backgroundImage = c.image ? `url("${c.image}")` : "none";
-    this._card.style.backgroundPosition = `center ${c.image_position}`;
+    this._card.style.backgroundPosition = `center ${Number(imageOffset(this._userConfig))}%`;
 
     // An ellipse centred on the top left corner. With the default size its edge passes
     // through the middle of the image, so the fade ends half way along the diagonal.
@@ -226,20 +231,7 @@ const EDITOR_SCHEMA = [
     schema: [
       { name: "height_percent", selector: percentSlider(20, 100) },
       { name: "height_percent_mobile", selector: percentSlider(20, 100) },
-      {
-        name: "image_position",
-        required: true,
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: "top", label: "Top" },
-              { value: "center", label: "Middle" },
-              { value: "bottom", label: "Bottom" },
-            ],
-          },
-        },
-      },
+      { name: "image_offset", selector: percentSlider(0, 100) },
     ],
   },
   {
@@ -301,7 +293,7 @@ const EDITOR_LABELS = {
   image: "Background image",
   height_percent: "Height on desktop",
   height_percent_mobile: "Height on phones",
-  image_position: "Image alignment",
+  image_offset: "Image position",
   text_color: "Colour",
   font_weight: "Weight",
   font_size: "Size",
@@ -317,7 +309,7 @@ const EDITOR_HELPERS = {
   image: "Put the image in your /config/www folder, then enter /local/ and the file name, e.g. /local/lounge.jpeg",
   height_percent: "100% shows the whole image. Lower values crop it.",
   height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px.`,
-  image_position: "Which part of the image to keep when the height crops it.",
+  image_offset: "Which part of the image to show when the height crops it: 0% is the top, 50% the middle, 100% the bottom.",
   font_size: "Leave blank to scale the title with the card (recommended).",
   fade_start_opacity: "How dark the fade is in the top left corner.",
   fade_width: "How far the fade reaches, as a % of the card width.",
@@ -351,6 +343,7 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
         // Only save what differs from the defaults, so the YAML stays short
         const config = { ...ev.detail.value };
         delete config.height; // pixel height from v0.2.0, replaced by height_percent
+        delete config.image_position; // replaced by image_offset
         Object.keys(config).forEach((key) => {
           const value = config[key];
           const empty = value === "" || value === undefined || value === null;
@@ -376,7 +369,7 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     // Show the defaults in the form so the colour pickers and sliders aren't blank.
     // The phone height starts at the desktop height until it's changed.
-    const data = { ...DEFAULTS, ...this._config };
+    const data = { ...DEFAULTS, ...this._config, image_offset: imageOffset(this._config) };
     if (data.height_percent_mobile === undefined) data.height_percent_mobile = data.height_percent;
     this._shownMobile = data.height_percent_mobile;
     this._form.data = data;

@@ -40,7 +40,7 @@ title: Lounge
 image: /local/lounge.jpeg
 height_percent: 70                # optional
 height_percent_mobile: 100        # optional
-image_position: bottom            # optional: top, center or bottom
+image_offset: 80                  # optional: 0 = top of the image, 100 = bottom
 text_color: [255, 255, 255]       # optional
 fade_start_color: [0, 0, 0]       # optional
 fade_end_color: [255, 255, 255]   # optional
@@ -58,7 +58,7 @@ fade_end_color: [255, 255, 255]   # optional
 | `font_family`        | `Roboto`          | Title font                                                       |
 | `height_percent`     | `100`             | Card height as a % of the image height. `100` shows the whole image; lower values crop it. The card keeps this shape on every screen, so a phone shows a scaled-down copy of the desktop card |
 | `height_percent_mobile` | same as `height_percent` | Card height on screens narrower than 768px, as a % of the image height. Use this if the desktop height looks too short on a phone |
-| `image_position`     | `center`          | Which part of the image to show when the height crops it: `top`, `center` or `bottom` |
+| `image_offset`       | `50`              | Which part of the image to show when the height crops it, from `0` (top) to `100` (bottom). The older `image_position: top / center / bottom` still works |
 | `fade_start_color`   | `[0, 0, 0]`       | Fade colour in the top left corner                               |
 | `fade_start_opacity` | `70`              | Fade opacity in the top left corner (0–100)                      |
 | `fade_end_color`     | `[255, 255, 255]` | Fade colour where the fade ends                                  |
