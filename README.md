@@ -54,8 +54,9 @@ fade_end_color: [255, 255, 255]   # optional
 | `image`              | none              | URL of the background image                                      |
 | `text_color`         | `[255, 255, 255]` | Title colour, as `[r, g, b]` or any CSS colour (e.g. `"#fff"`)   |
 | `font_size`          | scales with card  | Title size in px. Leave blank to scale with the card width (recommended) |
-| `font_weight`        | `200`             | Title weight (`200` is Roboto Extra Light)                       |
-| `font_family`        | `Roboto`          | Title font                                                       |
+| `font_weight`        | `200`             | Title weight, from `100` (thin) to `900` (black). `200` is Extra light |
+| `font_family`        | `Roboto`          | Title font: `theme`, or the name of any font from [Google Fonts](https://fonts.google.com) |
+| `font_url`           | none              | A font file you host yourself, e.g. `/local/fonts/myfont.woff2`. Used instead of `font_family` |
 | `height_percent`     | `100`             | Card height as a % of the image height. `100` shows the whole image; lower values crop it. The card keeps this shape on every screen, so a phone shows a scaled-down copy of the desktop card |
 | `height_percent_mobile` | same as `height_percent` | Card height on screens narrower than 768px, as a % of the image height. Use this if the desktop height looks too short on a phone |
 | `image_offset`       | `50`              | Which part of the image to show when the height crops it, from `0` (top) to `100` (bottom). The older `image_position: top / center / bottom` still works |
@@ -81,4 +82,13 @@ For the header to line up with the sections below it, put it in its own section 
 | `mdc-header-title-margin`     | `0`         |
 | `mdc-header-title-padding`    | `max(2cqw, 12px) max(2.1cqw, 16px)` (scales with the card, never smaller than 12px / 16px) |
 
-The card loads Roboto from Google Fonts so that every weight, including Extra Light, is available.
+## Fonts
+
+Pick a font in the editor under **Title text → Font**:
+
+- **Theme font** uses your Home Assistant theme's font. Nothing is downloaded.
+- **Roboto, Inter, Montserrat** and the other listed fonts come from Google Fonts. They all have light weights, which suit a header.
+- **Other Google font…** lets you type the name of any font on [fonts.google.com](https://fonts.google.com).
+- **Custom font file…** uses a font file you put in your `/config/www` folder (`.woff2` or `.ttf`), e.g. `/local/fonts/myfont.woff2`.
+
+Google fonts are downloaded by each device that shows the dashboard, so they need an internet connection, and the device contacts Google. If you'd rather avoid that, use **Theme font** or **Custom font file**. If a font can't be loaded, the card falls back to your theme's font.

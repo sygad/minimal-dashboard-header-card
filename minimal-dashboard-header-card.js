@@ -46,15 +46,67 @@ const imageOffset = (config) => config.image_offset ?? LEGACY_POSITIONS[config.i
 const FADE_EASING = 1.6;
 const FADE_STEPS = 8;
 
-// Load Roboto (all weights, including Extra Light 200) once for the whole page.
-// Fonts must be loaded in the main document; @font-face inside a shadow root is ignored.
-const FONT_LINK_ID = "minimal-dashboard-header-card-font";
-if (!document.getElementById(FONT_LINK_ID)) {
+// ---- Fonts -------------------------------------------------------------
+// font_family is "theme", one of the fonts below, or any Google Fonts name.
+// font_url points at a self-hosted font file and takes priority over font_family.
+// Only the font in use is downloaded. Fonts must be loaded in the main document,
+// because @font-face inside a shadow root is ignored.
+
+const THEME_FONT = "var(--ha-font-family-body, var(--primary-font-family, Roboto, sans-serif))";
+
+// Popular Google Fonts with light weights, and the weights each one has
+const FONT_LIST = {
+  Roboto: "100..900",
+  Inter: "100..900",
+  Montserrat: "100..900",
+  Raleway: "100..900",
+  Poppins: "100;200;300;400;500;600;700;800;900",
+  Lato: "100;300;400;700;900",
+  Nunito: "200..1000",
+  "Open Sans": "300..800",
+  Oswald: "200..700",
+  "Playfair Display": "400..900",
+};
+
+const googleFontUrl = (family, weights) =>
+  `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}` +
+  (weights ? `:wght@${weights}` : "") +
+  "&display=swap";
+
+function loadGoogleFont(family) {
+  const id = `mdhc-font-${family.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  if (document.getElementById(id)) return;
   const link = document.createElement("link");
-  link.id = FONT_LINK_ID;
+  link.id = id;
   link.rel = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap";
+  link.href = googleFontUrl(family, FONT_LIST[family] || "100..900");
+  // A font that isn't in FONT_LIST may not have every weight, which Google rejects,
+  // so fall back to asking for the font with its default weight
+  link.onerror = () => {
+    link.onerror = null;
+    link.href = googleFontUrl(family);
+  };
   document.head.appendChild(link);
+}
+
+function loadFontFile(url) {
+  const family = `mdhc-custom-${Array.from(url).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)}`;
+  if (!document.getElementById(family)) {
+    const style = document.createElement("style");
+    style.id = family;
+    style.textContent = `@font-face { font-family: "${family}"; src: url("${url}"); font-weight: 100 900; font-display: swap; }`;
+    document.head.appendChild(style);
+  }
+  return family;
+}
+
+// Returns the CSS font-family for a config, loading the font if needed
+function titleFont(config) {
+  if (config.font_url) return `"${loadFontFile(config.font_url)}", ${THEME_FONT}`;
+  const family = String(config.font_family || DEFAULTS.font_family).trim();
+  if (family === "theme") return THEME_FONT;
+  loadGoogleFont(family);
+  return `"${family}", ${THEME_FONT}`;
 }
 
 const clampOpacity = (percent) => Math.max(0, Math.min(100, Number(percent))) / 100;
@@ -208,7 +260,7 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
     this._title.textContent = c.title || "";
     this._title.style.color = toCssColor(c.text_color, 100);
-    this._title.style.fontFamily = `"${c.font_family}", var(--ha-font-family-body, sans-serif)`;
+    this._title.style.fontFamily = titleFont(c);
     this._title.style.fontWeight = c.font_weight;
     this._title.style.fontSize = c.font_size ? `${Number(c.font_size)}px` : TITLE_SIZE;
   }
@@ -218,8 +270,28 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
 const percentSlider = (min, max) => ({ number: { min, max, mode: "slider", unit_of_measurement: "%" } });
 
+// The editor's Font dropdown. "other" and "custom" show an extra field.
+const FONT_CHOICES = [
+  { value: "theme", label: "Theme font" },
+  ...Object.keys(FONT_LIST).map((family) => ({ value: family, label: family })),
+  { value: "other", label: "Other Google font…" },
+  { value: "custom", label: "Custom font file…" },
+];
+
+function fontChoiceOf(config) {
+  if (config.font_url) return "custom";
+  const family = config.font_family ?? DEFAULTS.font_family;
+  return family === "theme" || family in FONT_LIST ? family : "other";
+}
+
+const fontFields = (fontChoice) => [
+  { name: "font_choice", required: true, selector: { select: { mode: "dropdown", options: FONT_CHOICES } } },
+  ...(fontChoice === "other" ? [{ name: "font_other", selector: { text: {} } }] : []),
+  ...(fontChoice === "custom" ? [{ name: "font_url", selector: { text: {} } }] : []),
+];
+
 // Title and image are always visible; everything else is in collapsible sections.
-const EDITOR_SCHEMA = [
+const editorSchema = (fontChoice) => [
   { name: "title", selector: { text: {} } },
   { name: "image", selector: { text: {} } },
   {
@@ -241,6 +313,7 @@ const EDITOR_SCHEMA = [
     title: "Title text",
     icon: "mdi:format-text",
     schema: [
+      ...fontFields(fontChoice),
       { name: "text_color", selector: { color_rgb: {} } },
       {
         name: "font_weight",
@@ -295,6 +368,9 @@ const EDITOR_LABELS = {
   height_percent_mobile: "Height on phones",
   image_offset: "Image position",
   text_color: "Colour",
+  font_choice: "Font",
+  font_other: "Google font name",
+  font_url: "Font file",
   font_weight: "Weight",
   font_size: "Size",
   fade_start_color: "Colour",
@@ -310,6 +386,10 @@ const EDITOR_HELPERS = {
   height_percent: "100% shows the whole image. Lower values crop it.",
   height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px.`,
   image_offset: "Which part of the image to show when the height crops it: 0% is the top, 50% the middle, 100% the bottom.",
+  font_choice: "Fonts other than Theme font are downloaded when the dashboard loads.",
+  font_other: "Any font from fonts.google.com, e.g. Lobster",
+  font_url: "Put a .woff2 or .ttf file in your /config/www folder, then enter /local/ and the file name, e.g. /local/fonts/myfont.woff2",
+  font_weight: "Not every font has every weight; the closest one is used.",
   font_size: "Leave blank to scale the title with the card (recommended).",
   fade_start_opacity: "How dark the fade is in the top left corner.",
   fade_width: "How far the fade reaches, as a % of the card width.",
@@ -336,12 +416,21 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
 
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.schema = EDITOR_SCHEMA;
       this._form.computeLabel = (schema) => schema.title || EDITOR_LABELS[schema.name] || schema.name;
       this._form.computeHelper = (schema) => EDITOR_HELPERS[schema.name];
       this._form.addEventListener("value-changed", (ev) => {
         // Only save what differs from the defaults, so the YAML stays short
         const config = { ...ev.detail.value };
+        // The font dropdown isn't saved: it decides font_family and font_url
+        this._fontChoice = config.font_choice;
+        if (config.font_choice === "custom") {
+          delete config.font_family;
+        } else {
+          config.font_family = config.font_choice === "other" ? config.font_other : config.font_choice;
+          delete config.font_url;
+        }
+        delete config.font_choice;
+        delete config.font_other;
         delete config.height; // pixel height from v0.2.0, replaced by height_percent
         delete config.image_position; // replaced by image_offset
         Object.keys(config).forEach((key) => {
@@ -372,6 +461,17 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     const data = { ...DEFAULTS, ...this._config, image_offset: imageOffset(this._config) };
     if (data.height_percent_mobile === undefined) data.height_percent_mobile = data.height_percent;
     this._shownMobile = data.height_percent_mobile;
+    // Remember "Other" or "Custom" while its field is still empty, so the dropdown doesn't jump back
+    const pending =
+      (this._fontChoice === "other" && !this._config.font_family) ||
+      (this._fontChoice === "custom" && !this._config.font_url);
+    const fontChoice = pending ? this._fontChoice : fontChoiceOf(this._config);
+    data.font_choice = fontChoice;
+    data.font_other = fontChoice === "other" ? this._config.font_family ?? "" : "";
+    if (this._schemaFont !== fontChoice) {
+      this._schemaFont = fontChoice;
+      this._form.schema = editorSchema(fontChoice);
+    }
     this._form.data = data;
   }
 }
