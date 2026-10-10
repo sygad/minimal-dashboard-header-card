@@ -3,7 +3,7 @@
  * A background image with a diagonal colour fade and a title in the top left corner.
  */
 
-const CARD_VERSION = "0.3.1";
+const CARD_VERSION = "0.4.0";
 
 console.info(
   `%c MINIMAL-DASHBOARD-HEADER-CARD %c v${CARD_VERSION} `,
@@ -34,6 +34,9 @@ const IMAGE_WIDTH = 2064;
 const IMAGE_HEIGHT = 512;
 const IMAGE_HEIGHT_CQW = (512 / 2064) * 100; // image height as a % of the card width
 const TITLE_SIZE = "7.75cqw";
+
+// Screens narrower than this use height_percent_mobile, if it's set.
+const MOBILE_BREAKPOINT = 768;
 
 // How quickly the fade falls off. 1 is linear; higher values fade out faster near the corner.
 const FADE_EASING = 1.6;
@@ -94,6 +97,7 @@ const STYLES = `
     overflow: hidden;
     container-type: inline-size;
     box-sizing: border-box;
+    aspect-ratio: var(--mdc-header-ratio);
     border: none;
     /* Same rounding as the other cards in the theme */
     border-radius: var(--mdc-header-card-radius, var(--ha-card-border-radius, 12px));
@@ -102,6 +106,11 @@ const STYLES = `
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;
+  }
+  @media (max-width: ${MOBILE_BREAKPOINT - 1}px) {
+    ha-card {
+      aspect-ratio: var(--mdc-header-ratio-mobile, var(--mdc-header-ratio));
+    }
   }
   .fade {
     position: absolute;
@@ -175,8 +184,11 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
     const c = this._config;
 
-    const heightPercent = Number(c.height_percent) > 0 ? Number(c.height_percent) : DEFAULTS.height_percent;
-    this._card.style.aspectRatio = `${IMAGE_WIDTH} / ${(IMAGE_HEIGHT * heightPercent) / 100}`;
+    const ratio = (percent) => `${IMAGE_WIDTH} / ${(IMAGE_HEIGHT * percent) / 100}`;
+    const desktopPercent = Number(c.height_percent) > 0 ? Number(c.height_percent) : DEFAULTS.height_percent;
+    const mobilePercent = Number(c.height_percent_mobile) > 0 ? Number(c.height_percent_mobile) : desktopPercent;
+    this._card.style.setProperty("--mdc-header-ratio", ratio(desktopPercent));
+    this._card.style.setProperty("--mdc-header-ratio-mobile", ratio(mobilePercent));
     this._card.style.backgroundImage = c.image ? `url("${c.image}")` : "none";
     this._card.style.backgroundPosition = `center ${c.image_position}`;
 
@@ -199,16 +211,24 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
 // ---- Visual editor -----------------------------------------------------
 
+const percentSlider = (min, max) => ({ number: { min, max, mode: "slider", unit_of_measurement: "%" } });
+
+// Title and image are always visible; everything else is in collapsible sections.
 const EDITOR_SCHEMA = [
   { name: "title", selector: { text: {} } },
   { name: "image", selector: { text: {} } },
   {
-    type: "grid",
-    name: "",
+    name: "size_section",
+    type: "expandable",
+    flatten: true,
+    title: "Size",
+    icon: "mdi:arrow-expand-vertical",
     schema: [
-      { name: "height_percent", selector: { number: { min: 20, max: 100, mode: "slider", unit_of_measurement: "%" } } },
+      { name: "height_percent", selector: percentSlider(20, 100) },
+      { name: "height_percent_mobile", selector: percentSlider(20, 100) },
       {
         name: "image_position",
+        required: true,
         selector: {
           select: {
             mode: "dropdown",
@@ -223,64 +243,90 @@ const EDITOR_SCHEMA = [
     ],
   },
   {
-    type: "grid",
-    name: "",
+    name: "text_section",
+    type: "expandable",
+    flatten: true,
+    title: "Title text",
+    icon: "mdi:format-text",
     schema: [
       { name: "text_color", selector: { color_rgb: {} } },
-      { name: "font_size", selector: { number: { min: 10, max: 200, mode: "box", unit_of_measurement: "px" } } },
       {
         name: "font_weight",
+        required: true,
         selector: {
           select: {
             mode: "dropdown",
             options: [
-              { value: 100, label: "Thin (100)" },
-              { value: 200, label: "Extra Light (200)" },
-              { value: 300, label: "Light (300)" },
-              { value: 400, label: "Regular (400)" },
-              { value: 500, label: "Medium (500)" },
-              { value: 700, label: "Bold (700)" },
+              { value: 100, label: "Thin" },
+              { value: 200, label: "Extra light" },
+              { value: 300, label: "Light" },
+              { value: 400, label: "Regular" },
+              { value: 500, label: "Medium" },
+              { value: 700, label: "Bold" },
             ],
           },
         },
       },
+      { name: "font_size", selector: { number: { min: 10, max: 200, mode: "box", unit_of_measurement: "px" } } },
     ],
   },
   {
-    type: "grid",
-    name: "",
+    name: "fade_section",
+    type: "expandable",
+    flatten: true,
+    title: "Fade",
+    icon: "mdi:gradient-horizontal",
     schema: [
       { name: "fade_start_color", selector: { color_rgb: {} } },
-      { name: "fade_start_opacity", selector: { number: { min: 0, max: 100, mode: "slider", unit_of_measurement: "%" } } },
-      { name: "fade_end_color", selector: { color_rgb: {} } },
-      { name: "fade_end_opacity", selector: { number: { min: 0, max: 100, mode: "slider", unit_of_measurement: "%" } } },
-    ],
-  },
-  {
-    type: "grid",
-    name: "",
-    schema: [
-      { name: "fade_width", selector: { number: { min: 0, max: 200, mode: "slider", unit_of_measurement: "%" } } },
-      { name: "fade_height", selector: { number: { min: 0, max: 300, mode: "slider", unit_of_measurement: "%" } } },
+      { name: "fade_start_opacity", selector: percentSlider(0, 100) },
+      { name: "fade_width", selector: percentSlider(0, 200) },
+      { name: "fade_height", selector: percentSlider(0, 300) },
+      {
+        name: "fade_more_section",
+        type: "expandable",
+        flatten: true,
+        title: "More fade options",
+        icon: "mdi:tune-variant",
+        schema: [
+          { name: "fade_end_color", selector: { color_rgb: {} } },
+          { name: "fade_end_opacity", selector: percentSlider(0, 100) },
+        ],
+      },
     ],
   },
 ];
 
 const EDITOR_LABELS = {
   title: "Title",
-  image: "Background image URL (e.g. /local/lounge.jpeg)",
-  text_color: "Text colour",
-  font_size: "Text size (blank = scale with card)",
-  font_weight: "Text weight",
-  height_percent: "Card height (% of the image height)",
-  image_position: "Image alignment when the height crops it",
-  fade_start_color: "Fade colour (top left)",
-  fade_start_opacity: "Fade opacity (top left)",
-  fade_end_color: "Fade colour (end)",
-  fade_end_opacity: "Fade opacity (end)",
-  fade_width: "Fade width (% of card width)",
-  fade_height: "Fade height (% of image height)",
+  image: "Background image",
+  height_percent: "Height on desktop",
+  height_percent_mobile: "Height on phones",
+  image_position: "Image alignment",
+  text_color: "Colour",
+  font_weight: "Weight",
+  font_size: "Size",
+  fade_start_color: "Colour",
+  fade_start_opacity: "Strength",
+  fade_width: "Reach across",
+  fade_height: "Reach down",
+  fade_end_color: "End colour",
+  fade_end_opacity: "End strength",
 };
+
+const EDITOR_HELPERS = {
+  image: "Put the image in your /config/www folder, then enter /local/ and the file name, e.g. /local/lounge.jpeg",
+  height_percent: "100% shows the whole image. Lower values crop it.",
+  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px.`,
+  image_position: "Which part of the image to keep when the height crops it.",
+  font_size: "Leave blank to scale the title with the card (recommended).",
+  fade_start_opacity: "How dark the fade is in the top left corner.",
+  fade_width: "How far the fade reaches, as a % of the card width.",
+  fade_height: "How far the fade reaches, as a % of the image height.",
+  fade_end_color: "The colour the fade blends into. Only visible if End strength is above 0%.",
+};
+
+// Values the editor fills in for display but doesn't need to save.
+const isDefault = (key, value) => key in DEFAULTS && JSON.stringify(DEFAULTS[key]) === JSON.stringify(value);
 
 class MinimalDashboardHeaderCardEditor extends HTMLElement {
   setConfig(config) {
@@ -299,13 +345,16 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.schema = EDITOR_SCHEMA;
-      this._form.computeLabel = (schema) => EDITOR_LABELS[schema.name] || schema.name;
+      this._form.computeLabel = (schema) => schema.title || EDITOR_LABELS[schema.name] || schema.name;
+      this._form.computeHelper = (schema) => EDITOR_HELPERS[schema.name];
       this._form.addEventListener("value-changed", (ev) => {
-        // Drop empty fields so the defaults are used
+        // Only save what differs from the defaults, so the YAML stays short
         const config = { ...ev.detail.value };
         delete config.height; // pixel height from v0.2.0, replaced by height_percent
         Object.keys(config).forEach((key) => {
-          if (config[key] === "" || config[key] === undefined || config[key] === null) delete config[key];
+          const value = config[key];
+          const empty = value === "" || value === undefined || value === null;
+          if (empty || (key !== "title" && isDefault(key, value))) delete config[key];
         });
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -319,8 +368,11 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     }
 
     this._form.hass = this._hass;
-    // Show the defaults in the form so the colour pickers and sliders aren't blank
-    this._form.data = { ...DEFAULTS, ...this._config };
+    // Show the defaults in the form so the colour pickers and sliders aren't blank.
+    // The phone height starts at the desktop height until it's changed.
+    const data = { ...DEFAULTS, ...this._config };
+    if (data.height_percent_mobile === undefined) data.height_percent_mobile = data.height_percent;
+    this._form.data = data;
   }
 }
 

@@ -7,7 +7,8 @@ A simple Home Assistant header card: a background image with a diagonal colour f
 - Pick your own background image
 - The fade colours, opacity and length can all be changed
 - The title text, colour, size and weight can all be changed
-- Visual editor, so you don't need to write YAML
+- Separate heights for desktop and phones
+- Simple visual editor, so you don't need to write YAML
 
 ## Installation (HACS)
 
@@ -38,6 +39,7 @@ type: custom:minimal-dashboard-header-card
 title: Lounge
 image: /local/lounge.jpeg
 height_percent: 70                # optional
+height_percent_mobile: 100        # optional
 image_position: bottom            # optional: top, center or bottom
 text_color: [255, 255, 255]       # optional
 fade_start_color: [0, 0, 0]       # optional
@@ -55,6 +57,7 @@ fade_end_color: [255, 255, 255]   # optional
 | `font_weight`        | `200`             | Title weight (`200` is Roboto Extra Light)                       |
 | `font_family`        | `Roboto`          | Title font                                                       |
 | `height_percent`     | `100`             | Card height as a % of the image height. `100` shows the whole image; lower values crop it. The card keeps this shape on every screen, so a phone shows a scaled-down copy of the desktop card |
+| `height_percent_mobile` | same as `height_percent` | Card height on screens narrower than 768px, as a % of the image height. Use this if the desktop height looks too short on a phone |
 | `image_position`     | `center`          | Which part of the image to show when the height crops it: `top`, `center` or `bottom` |
 | `fade_start_color`   | `[0, 0, 0]`       | Fade colour in the top left corner                               |
 | `fade_start_opacity` | `70`              | Fade opacity in the top left corner (0–100)                      |
