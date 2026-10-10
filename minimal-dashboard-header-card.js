@@ -49,17 +49,22 @@ const imageOffset = (config) => config.image_offset ?? LEGACY_POSITIONS[config.i
 const FADE_EASING = 1.6;
 const FADE_STEPS = 8;
 
-// ---- Phone preview -----------------------------------------------------
-// The editor tells the card preview to show the phone version while the phone panel
-// is open, so phone settings aren't changed blind. The dashboard behind the editor
-// dialog is covered, and the mode resets when the editor closes.
+// ---- Editor preview ----------------------------------------------------
+// While the editor is open, its "Show in preview" switches choose whether the card
+// preview shows the desktop or the phone version, and the preview is labelled.
+// previewMode is null when no editor is open. The dashboard behind the editor dialog
+// is covered, and everything resets when the editor closes.
 const PHONE_PREVIEW_WIDTH = 390;
 const PREVIEW_EVENT = "minimal-dashboard-header-card-preview";
-let phonePreview = false;
+const PREVIEW_LABELS = {
+  desktop: { icon: "mdi:monitor", text: "Desktop preview" },
+  phone: { icon: "mdi:cellphone", text: "Phone preview" },
+};
+let previewMode = null;
 
-function setPhonePreview(on) {
-  if (phonePreview === on) return;
-  phonePreview = on;
+function setPreviewMode(mode) {
+  if (previewMode === mode) return;
+  previewMode = mode;
   window.dispatchEvent(new CustomEvent(PREVIEW_EVENT));
 }
 
@@ -186,12 +191,31 @@ const STYLES = `
       background-position: center var(--mdc-header-offset-mobile);
     }
   }
-  /* While the editor's phone panel is open, the preview shows the phone version */
+  /* The editor's phone preview */
   ha-card.phone-preview {
     max-width: ${PHONE_PREVIEW_WIDTH}px;
     margin: 0 auto;
     aspect-ratio: var(--mdc-header-ratio-mobile);
     background-position: center var(--mdc-header-offset-mobile);
+  }
+  .preview-label {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 1;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font: 500 11px/1 var(--ha-font-family-body, Roboto, sans-serif);
+    pointer-events: none;
+    --mdc-icon-size: 14px;
+  }
+  .preview-label.show {
+    display: flex;
   }
   .fade {
     position: absolute;
@@ -215,7 +239,16 @@ class MinimalDashboardHeaderCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._onPreviewMode = () => this._card?.classList.toggle("phone-preview", phonePreview);
+    this._onPreviewMode = () => {
+      if (!this._card) return;
+      this._card.classList.toggle("phone-preview", previewMode === "phone");
+      const label = PREVIEW_LABELS[previewMode];
+      this._label.classList.toggle("show", Boolean(label));
+      if (label) {
+        this._label.querySelector("ha-icon").setAttribute("icon", label.icon);
+        this._label.querySelector("span").textContent = label.text;
+      }
+    };
   }
 
   connectedCallback() {
@@ -267,9 +300,11 @@ class MinimalDashboardHeaderCard extends HTMLElement {
         <ha-card>
           <div class="fade"></div>
           <div class="title"></div>
+          <div class="preview-label"><ha-icon></ha-icon><span></span></div>
         </ha-card>
       `;
       this._card = this.shadowRoot.querySelector("ha-card");
+      this._label = this.shadowRoot.querySelector(".preview-label");
       this._onPreviewMode();
       this._fade = this.shadowRoot.querySelector(".fade");
       this._title = this.shadowRoot.querySelector(".title");
@@ -338,6 +373,7 @@ const editorSchema = (fontChoice) => [
     title: "Desktop size & position",
     icon: "mdi:monitor",
     schema: [
+      { name: "preview_desktop", selector: { boolean: {} } },
       { name: "height_percent", selector: percentSlider(20, 100) },
       { name: "image_offset", selector: percentSlider(0, 100) },
     ],
@@ -349,6 +385,7 @@ const editorSchema = (fontChoice) => [
     title: "Phone size & position",
     icon: "mdi:cellphone",
     schema: [
+      { name: "preview_phone", selector: { boolean: {} } },
       { name: "height_percent_mobile", selector: percentSlider(20, 100) },
       { name: "image_offset_mobile", selector: percentSlider(0, 100) },
     ],
@@ -411,6 +448,8 @@ const editorSchema = (fontChoice) => [
 const EDITOR_LABELS = {
   title: "Title",
   image: "Background image",
+  preview_desktop: "Show in preview",
+  preview_phone: "Show in preview",
   height_percent: "Height",
   height_percent_mobile: "Height",
   image_offset: "Image position",
@@ -432,7 +471,7 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   image: "Put the image in your /config/www folder, then enter /local/ and the file name, e.g. /local/lounge.jpeg",
   height_percent: "100% shows the whole image. Lower values crop it.",
-  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px. The preview shows the phone version while this section is open.`,
+  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px. 100% shows the whole image.`,
   image_offset: "Which part of the image to show when the height crops it: 0% is the top, 50% the middle, 100% the bottom.",
   image_offset_mobile: "0% is the top of the image, 50% the middle, 100% the bottom.",
   font_choice: "Fonts other than Theme font are downloaded when the dashboard loads.",
@@ -451,20 +490,12 @@ const isDefault = (key, value) => key in DEFAULTS && JSON.stringify(DEFAULTS[key
 
 class MinimalDashboardHeaderCardEditor extends HTMLElement {
   connectedCallback() {
-    // Switch the preview to the phone version while the phone panel is open
-    // (or was opened most recently), and back when it's closed
-    this._onPanelToggle = (ev) => {
-      const panel = ev.composedPath().find((el) => el.schema?.type === "expandable");
-      const name = panel?.schema?.name;
-      if (name === "phone_section") setPhonePreview(ev.detail.expanded);
-      if (name === "desktop_section" && ev.detail.expanded) setPhonePreview(false);
-    };
-    this.addEventListener("expanded-changed", this._onPanelToggle);
+    this._previewMode = this._previewMode || "desktop";
+    setPreviewMode(this._previewMode);
   }
 
   disconnectedCallback() {
-    this.removeEventListener("expanded-changed", this._onPanelToggle);
-    setPhonePreview(false);
+    setPreviewMode(null);
   }
 
   setConfig(config) {
@@ -477,6 +508,12 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     this._render();
   }
 
+  // True when the form only echoed back what it was last given (e.g. a preview switch was
+  // clicked). Compares with a snapshot, because ha-form may update its data object in place.
+  _sameAsSaved(formValue) {
+    return this._shownSnapshot === JSON.stringify(formValue);
+  }
+
   _render() {
     if (!this._hass || !this._config) return;
 
@@ -487,6 +524,18 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (ev) => {
         // Only save what differs from the defaults, so the YAML stays short
         const config = { ...ev.detail.value };
+        // The two "Show in preview" switches work as a pair and aren't saved.
+        // Turning one on turns the other off; the one that's on can't be turned off.
+        const mode = this._previewMode;
+        if (config.preview_phone && mode !== "phone") this._previewMode = "phone";
+        else if (config.preview_desktop && mode !== "desktop") this._previewMode = "desktop";
+        delete config.preview_desktop;
+        delete config.preview_phone;
+        if (this._previewMode !== mode || this._sameAsSaved(config)) {
+          setPreviewMode(this._previewMode);
+          this._render();
+          return;
+        }
         // The font dropdown isn't saved: it decides font_family and font_url
         this._fontChoice = config.font_choice;
         if (config.font_choice === "custom") {
@@ -518,6 +567,8 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
     this._form.hass = this._hass;
     // Show the defaults in the form so the colour pickers and sliders aren't blank.
     const data = { ...DEFAULTS, ...this._config, image_offset: imageOffset(this._config) };
+    data.preview_desktop = this._previewMode !== "phone";
+    data.preview_phone = this._previewMode === "phone";
     // Remember "Other" or "Custom" while its field is still empty, so the dropdown doesn't jump back
     const pending =
       (this._fontChoice === "other" && !this._config.font_family) ||
@@ -529,6 +580,8 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
       this._schemaFont = fontChoice;
       this._form.schema = editorSchema(fontChoice);
     }
+    const { preview_desktop, preview_phone, ...shown } = data;
+    this._shownSnapshot = JSON.stringify(shown);
     this._form.data = data;
   }
 }
