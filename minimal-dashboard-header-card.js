@@ -3,7 +3,7 @@
  * A background image with a diagonal colour fade and a title in the top left corner.
  */
 
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.0";
 
 console.info(
   `%c MINIMAL-DASHBOARD-HEADER-CARD %c v${CARD_VERSION} `,
@@ -15,6 +15,7 @@ const DEFAULTS = {
   title: "Lounge",
   image: "",
   image_position: "center",
+  height_percent: 100,
   fade_start_color: [0, 0, 0],
   fade_start_opacity: 70,
   fade_end_color: [255, 255, 255],
@@ -26,10 +27,11 @@ const DEFAULTS = {
   font_weight: 200,
 };
 
-// The card keeps the shape of the reference design (2064 x 512) unless a height is set.
-// The width always comes from the dashboard layout, and the image, fade and title all
-// scale with the width only, so changing the height just shows more or less of the image.
-const ASPECT_RATIO = "2064 / 512";
+// The width always comes from the dashboard layout. The height is a % of the image height
+// (2064 x 512), so the card keeps the same shape on every screen, and the image, fade and
+// title all scale with the width: a phone shows a scaled down copy of the desktop card.
+const IMAGE_WIDTH = 2064;
+const IMAGE_HEIGHT = 512;
 const IMAGE_HEIGHT_CQW = (512 / 2064) * 100; // image height as a % of the card width
 const TITLE_SIZE = "7.75cqw";
 
@@ -85,14 +87,11 @@ function fadeStops(start, startOpacity, end, endOpacity) {
 const STYLES = `
   :host {
     display: block;
-    height: 100%;
   }
   ha-card {
     display: block;
     position: relative;
     overflow: hidden;
-    height: 100%;
-    aspect-ratio: ${ASPECT_RATIO};
     container-type: inline-size;
     box-sizing: border-box;
     border: none;
@@ -146,7 +145,7 @@ class MinimalDashboardHeaderCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config?.height ? Math.max(1, Math.round(Number(this._config.height) / 50)) : 3;
+    return 3;
   }
 
   getGridOptions() {
@@ -173,9 +172,8 @@ class MinimalDashboardHeaderCard extends HTMLElement {
 
     const c = this._config;
 
-    // With a fixed height, turn off the aspect ratio so it can't change the width.
-    this._card.style.height = c.height ? `${Number(c.height)}px` : "";
-    this._card.style.aspectRatio = c.height ? "auto" : "";
+    const heightPercent = Number(c.height_percent) > 0 ? Number(c.height_percent) : DEFAULTS.height_percent;
+    this._card.style.aspectRatio = `${IMAGE_WIDTH} / ${(IMAGE_HEIGHT * heightPercent) / 100}`;
     this._card.style.backgroundImage = c.image ? `url("${c.image}")` : "none";
     this._card.style.backgroundPosition = `center ${c.image_position}`;
 
@@ -205,7 +203,7 @@ const EDITOR_SCHEMA = [
     type: "grid",
     name: "",
     schema: [
-      { name: "height", selector: { number: { min: 40, max: 600, mode: "box", unit_of_measurement: "px" } } },
+      { name: "height_percent", selector: { number: { min: 20, max: 100, mode: "slider", unit_of_measurement: "%" } } },
       {
         name: "image_position",
         selector: {
@@ -271,7 +269,7 @@ const EDITOR_LABELS = {
   text_color: "Text colour",
   font_size: "Text size (blank = scale with card)",
   font_weight: "Text weight",
-  height: "Card height (blank = match image shape)",
+  height_percent: "Card height (% of the image height)",
   image_position: "Image alignment when the height crops it",
   fade_start_color: "Fade colour (top left)",
   fade_start_opacity: "Fade opacity (top left)",
@@ -302,6 +300,7 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (ev) => {
         // Drop empty fields so the defaults are used
         const config = { ...ev.detail.value };
+        delete config.height; // pixel height from v0.2.0, replaced by height_percent
         Object.keys(config).forEach((key) => {
           if (config[key] === "" || config[key] === undefined || config[key] === null) delete config[key];
         });

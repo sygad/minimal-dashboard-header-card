@@ -37,7 +37,7 @@ Or with YAML:
 type: custom:minimal-dashboard-header-card
 title: Lounge
 image: /local/lounge.jpeg
-height: 120                       # optional
+height_percent: 70                # optional
 image_position: bottom            # optional: top, center or bottom
 text_color: [255, 255, 255]       # optional
 fade_start_color: [0, 0, 0]       # optional
@@ -51,10 +51,10 @@ fade_end_color: [255, 255, 255]   # optional
 | `title`              | `Lounge`          | The text in the top left corner                                  |
 | `image`              | none              | URL of the background image                                      |
 | `text_color`         | `[255, 255, 255]` | Title colour, as `[r, g, b]` or any CSS colour (e.g. `"#fff"`)   |
-| `font_size`          | scales with card  | Title size in px. Leave blank to scale with the card width       |
+| `font_size`          | scales with card  | Title size in px. Leave blank to scale with the card width (recommended) |
 | `font_weight`        | `200`             | Title weight (`200` is Roboto Extra Light)                       |
 | `font_family`        | `Roboto`          | Title font                                                       |
-| `height`             | image shape       | Card height in px. Leave blank to keep the 2064 × 512 shape. The width always comes from your dashboard layout |
+| `height_percent`     | `100`             | Card height as a % of the image height. `100` shows the whole image; lower values crop it. The card keeps this shape on every screen, so a phone shows a scaled-down copy of the desktop card |
 | `image_position`     | `center`          | Which part of the image to show when the height crops it: `top`, `center` or `bottom` |
 | `fade_start_color`   | `[0, 0, 0]`       | Fade colour in the top left corner                               |
 | `fade_start_opacity` | `70`              | Fade opacity in the top left corner (0–100)                      |
