@@ -14,8 +14,10 @@ console.info(
 const DEFAULTS = {
   title: "Lounge",
   image: "",
-  image_offset: 50,
   height_percent: 100,
+  image_offset: 50,
+  height_percent_mobile: 100,
+  image_offset_mobile: 50,
   fade_start_color: [0, 0, 0],
   fade_start_opacity: 70,
   fade_end_color: [255, 255, 255],
@@ -35,7 +37,8 @@ const IMAGE_HEIGHT = 512;
 const IMAGE_HEIGHT_CQW = (512 / 2064) * 100; // image height as a % of the card width
 const TITLE_SIZE = "7.75cqw";
 
-// Screens narrower than this use height_percent_mobile, if it's set.
+// Screens narrower than this use the phone settings (height_percent_mobile, image_offset_mobile).
+// Desktop and phone settings are independent.
 const MOBILE_BREAKPOINT = 768;
 
 // image_offset is 0 (top of the image) to 100 (bottom). image_position is from v0.2.0.
@@ -154,6 +157,7 @@ const STYLES = `
     container-type: inline-size;
     box-sizing: border-box;
     aspect-ratio: var(--mdc-header-ratio);
+    background-position: center var(--mdc-header-offset);
     border: none;
     /* Same rounding as the other cards in the theme */
     border-radius: var(--mdc-header-card-radius, var(--ha-card-border-radius, 12px));
@@ -161,11 +165,11 @@ const STYLES = `
     /* Fills the width; only scales up if the card is taller than the image */
     background-size: cover;
     background-repeat: no-repeat;
-    background-position: center;
   }
   @media (max-width: ${MOBILE_BREAKPOINT - 1}px) {
     ha-card {
-      aspect-ratio: var(--mdc-header-ratio-mobile, var(--mdc-header-ratio));
+      aspect-ratio: var(--mdc-header-ratio-mobile);
+      background-position: center var(--mdc-header-offset-mobile);
     }
   }
   .fade {
@@ -242,12 +246,13 @@ class MinimalDashboardHeaderCard extends HTMLElement {
     const c = this._config;
 
     const ratio = (percent) => `${IMAGE_WIDTH} / ${(IMAGE_HEIGHT * percent) / 100}`;
-    const desktopPercent = Number(c.height_percent) > 0 ? Number(c.height_percent) : DEFAULTS.height_percent;
-    const mobilePercent = Number(c.height_percent_mobile) > 0 ? Number(c.height_percent_mobile) : desktopPercent;
-    this._card.style.setProperty("--mdc-header-ratio", ratio(desktopPercent));
-    this._card.style.setProperty("--mdc-header-ratio-mobile", ratio(mobilePercent));
+    const percent = (value, fallback) => (Number(value) > 0 ? Number(value) : fallback);
+    const style = this._card.style;
+    style.setProperty("--mdc-header-ratio", ratio(percent(c.height_percent, DEFAULTS.height_percent)));
+    style.setProperty("--mdc-header-ratio-mobile", ratio(percent(c.height_percent_mobile, DEFAULTS.height_percent_mobile)));
+    style.setProperty("--mdc-header-offset", `${Number(imageOffset(this._userConfig))}%`);
+    style.setProperty("--mdc-header-offset-mobile", `${Number(c.image_offset_mobile)}%`);
     this._card.style.backgroundImage = c.image ? `url("${c.image}")` : "none";
-    this._card.style.backgroundPosition = `center ${Number(imageOffset(this._userConfig))}%`;
 
     // An ellipse centred on the top left corner. With the default size its edge passes
     // through the middle of the image, so the fade ends half way along the diagonal.
@@ -295,15 +300,25 @@ const editorSchema = (fontChoice) => [
   { name: "title", selector: { text: {} } },
   { name: "image", selector: { text: {} } },
   {
-    name: "size_section",
+    name: "desktop_section",
     type: "expandable",
     flatten: true,
-    title: "Size",
-    icon: "mdi:arrow-expand-vertical",
+    title: "Desktop size & position",
+    icon: "mdi:monitor",
     schema: [
       { name: "height_percent", selector: percentSlider(20, 100) },
-      { name: "height_percent_mobile", selector: percentSlider(20, 100) },
       { name: "image_offset", selector: percentSlider(0, 100) },
+    ],
+  },
+  {
+    name: "phone_section",
+    type: "expandable",
+    flatten: true,
+    title: "Phone size & position",
+    icon: "mdi:cellphone",
+    schema: [
+      { name: "height_percent_mobile", selector: percentSlider(20, 100) },
+      { name: "image_offset_mobile", selector: percentSlider(0, 100) },
     ],
   },
   {
@@ -364,9 +379,10 @@ const editorSchema = (fontChoice) => [
 const EDITOR_LABELS = {
   title: "Title",
   image: "Background image",
-  height_percent: "Height on desktop",
-  height_percent_mobile: "Height on phones",
+  height_percent: "Height",
+  height_percent_mobile: "Height",
   image_offset: "Image position",
+  image_offset_mobile: "Image position",
   text_color: "Colour",
   font_choice: "Font",
   font_other: "Google font name",
@@ -384,8 +400,9 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   image: "Put the image in your /config/www folder, then enter /local/ and the file name, e.g. /local/lounge.jpeg",
   height_percent: "100% shows the whole image. Lower values crop it.",
-  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px.`,
+  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px. 100% shows the whole image.`,
   image_offset: "Which part of the image to show when the height crops it: 0% is the top, 50% the middle, 100% the bottom.",
+  image_offset_mobile: "0% is the top of the image, 50% the middle, 100% the bottom.",
   font_choice: "Fonts other than Theme font are downloaded when the dashboard loads.",
   font_other: "Any font from fonts.google.com, e.g. Lobster",
   font_url: "Put a .woff2 or .ttf file in your /config/www folder, then enter /local/ and the file name, e.g. /local/fonts/myfont.woff2",
@@ -438,12 +455,6 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
           const empty = value === "" || value === undefined || value === null;
           if (empty || (key !== "title" && isDefault(key, value))) delete config[key];
         });
-        // Until the phone height is changed, don't save it, so it keeps following the desktop height
-        const phoneUntouched =
-          this._config.height_percent_mobile === undefined && config.height_percent_mobile === this._shownMobile;
-        if (phoneUntouched || config.height_percent_mobile === (config.height_percent ?? DEFAULTS.height_percent)) {
-          delete config.height_percent_mobile;
-        }
         this.dispatchEvent(
           new CustomEvent("config-changed", {
             detail: { config },
@@ -457,10 +468,7 @@ class MinimalDashboardHeaderCardEditor extends HTMLElement {
 
     this._form.hass = this._hass;
     // Show the defaults in the form so the colour pickers and sliders aren't blank.
-    // The phone height starts at the desktop height until it's changed.
     const data = { ...DEFAULTS, ...this._config, image_offset: imageOffset(this._config) };
-    if (data.height_percent_mobile === undefined) data.height_percent_mobile = data.height_percent;
-    this._shownMobile = data.height_percent_mobile;
     // Remember "Other" or "Custom" while its field is still empty, so the dropdown doesn't jump back
     const pending =
       (this._fontChoice === "other" && !this._config.font_family) ||
