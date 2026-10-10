@@ -49,6 +49,20 @@ const imageOffset = (config) => config.image_offset ?? LEGACY_POSITIONS[config.i
 const FADE_EASING = 1.6;
 const FADE_STEPS = 8;
 
+// ---- Phone preview -----------------------------------------------------
+// The editor tells the card preview to show the phone version while the phone panel
+// is open, so phone settings aren't changed blind. The dashboard behind the editor
+// dialog is covered, and the mode resets when the editor closes.
+const PHONE_PREVIEW_WIDTH = 390;
+const PREVIEW_EVENT = "minimal-dashboard-header-card-preview";
+let phonePreview = false;
+
+function setPhonePreview(on) {
+  if (phonePreview === on) return;
+  phonePreview = on;
+  window.dispatchEvent(new CustomEvent(PREVIEW_EVENT));
+}
+
 // ---- Fonts -------------------------------------------------------------
 // font_family is "theme", one of the fonts below, or any Google Fonts name.
 // font_url points at a self-hosted font file and takes priority over font_family.
@@ -172,6 +186,13 @@ const STYLES = `
       background-position: center var(--mdc-header-offset-mobile);
     }
   }
+  /* While the editor's phone panel is open, the preview shows the phone version */
+  ha-card.phone-preview {
+    max-width: ${PHONE_PREVIEW_WIDTH}px;
+    margin: 0 auto;
+    aspect-ratio: var(--mdc-header-ratio-mobile);
+    background-position: center var(--mdc-header-offset-mobile);
+  }
   .fade {
     position: absolute;
     inset: 0;
@@ -194,6 +215,16 @@ class MinimalDashboardHeaderCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this._onPreviewMode = () => this._card?.classList.toggle("phone-preview", phonePreview);
+  }
+
+  connectedCallback() {
+    window.addEventListener(PREVIEW_EVENT, this._onPreviewMode);
+    this._onPreviewMode();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(PREVIEW_EVENT, this._onPreviewMode);
   }
 
   // ---- Lovelace API ----------------------------------------------------
@@ -239,6 +270,7 @@ class MinimalDashboardHeaderCard extends HTMLElement {
         </ha-card>
       `;
       this._card = this.shadowRoot.querySelector("ha-card");
+      this._onPreviewMode();
       this._fade = this.shadowRoot.querySelector(".fade");
       this._title = this.shadowRoot.querySelector(".title");
     }
@@ -400,7 +432,7 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   image: "Put the image in your /config/www folder, then enter /local/ and the file name, e.g. /local/lounge.jpeg",
   height_percent: "100% shows the whole image. Lower values crop it.",
-  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px. 100% shows the whole image.`,
+  height_percent_mobile: `Used on screens narrower than ${MOBILE_BREAKPOINT}px. The preview shows the phone version while this section is open.`,
   image_offset: "Which part of the image to show when the height crops it: 0% is the top, 50% the middle, 100% the bottom.",
   image_offset_mobile: "0% is the top of the image, 50% the middle, 100% the bottom.",
   font_choice: "Fonts other than Theme font are downloaded when the dashboard loads.",
@@ -418,6 +450,23 @@ const EDITOR_HELPERS = {
 const isDefault = (key, value) => key in DEFAULTS && JSON.stringify(DEFAULTS[key]) === JSON.stringify(value);
 
 class MinimalDashboardHeaderCardEditor extends HTMLElement {
+  connectedCallback() {
+    // Switch the preview to the phone version while the phone panel is open
+    // (or was opened most recently), and back when it's closed
+    this._onPanelToggle = (ev) => {
+      const panel = ev.composedPath().find((el) => el.schema?.type === "expandable");
+      const name = panel?.schema?.name;
+      if (name === "phone_section") setPhonePreview(ev.detail.expanded);
+      if (name === "desktop_section" && ev.detail.expanded) setPhonePreview(false);
+    };
+    this.addEventListener("expanded-changed", this._onPanelToggle);
+  }
+
+  disconnectedCallback() {
+    this.removeEventListener("expanded-changed", this._onPanelToggle);
+    setPhonePreview(false);
+  }
+
   setConfig(config) {
     this._config = config;
     this._render();
